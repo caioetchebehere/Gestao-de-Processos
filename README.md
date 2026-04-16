@@ -47,7 +47,7 @@ Depois acesse: `http://localhost:3000`
 
 No projeto da Vercel, configure:
 
-- `BLOB_READ_WRITE_TOKEN`: token da sua store Vercel Blob com permissao de leitura/escrita.
+- `PROCESSOS_BLOB_TOKEN`: token da sua store Vercel Blob com permissao de leitura/escrita.
 
 O arquivo `vercel.json` ja esta configurado para:
 
