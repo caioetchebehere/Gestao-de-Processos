@@ -28,6 +28,13 @@
     versao: VERSAO_SCHEMA
   };
 
+  async function restaurarDoServidor() {
+    await carregar();
+    await removerProcessosPadraoNovo();
+    renderizarListaProcessos();
+    sincronizarUI();
+  }
+
   function getDataInicio(etapa) {
     return etapa.dataInicio != null && etapa.dataInicio !== '' ? etapa.dataInicio : (etapa.data || '');
   }
@@ -188,19 +195,16 @@
       if (!resp.ok) {
         let detalhe = '';
         try {
-          const err = await resp.json();
-          if (err && typeof err === 'object') {
-            detalhe = (err.error || err.detalhe || err.hint || '').toString();
-          }
-        } catch (_) {
-          // ignore
+          const erroApi = await resp.json();
+          detalhe = erroApi && erroApi.error ? String(erroApi.error) : '';
+        } catch (e) {
+          detalhe = '';
         }
-        throw new Error(detalhe || ('Falha ao salvar (HTTP ' + resp.status + ')'));
+        throw new Error(detalhe || 'Falha ao salvar');
       }
       return true;
     } catch (e) {
-      const msg = e && e.message ? e.message : '';
-      mostrarToast(msg ? ('Erro ao salvar: ' + msg) : 'Erro ao salvar no Vercel Blob.', 'erro');
+      mostrarToast('Erro ao salvar no Vercel Blob: ' + (e && e.message ? e.message : 'erro desconhecido'), 'erro');
       return false;
     }
   }
@@ -451,7 +455,11 @@
     if (!validarNomeProcesso()) return;
     proc.nome = ref.nomeProcesso.value.trim();
     proc.dataGoLive = (ref.dataGoLive.value || '').trim();
-    await salvar();
+    const salvo = await salvar();
+    if (!salvo) {
+      await restaurarDoServidor();
+      return;
+    }
     renderizarListaProcessos();
     mostrarToast('Dados do processo salvos.', 'sucesso');
   });
@@ -579,7 +587,11 @@
       proc.etapas = [...etapas, novaEtapa];
       mostrarToast('Etapa adicionada.', 'sucesso');
     }
-    await salvar();
+    const salvo = await salvar();
+    if (!salvo) {
+      await restaurarDoServidor();
+      return;
+    }
     limparFormEtapa();
     ref.btnAdicionarEtapa.textContent = 'Adicionar etapa';
     renderizarTabela();
@@ -647,7 +659,11 @@
     const proc = getProcessoAtual();
     if (!proc) return;
     proc.etapas = proc.etapas.filter(e => e.id !== id);
-    await salvar();
+    const salvo = await salvar();
+    if (!salvo) {
+      await restaurarDoServidor();
+      return;
+    }
     renderizarTabela();
     agendarAtualizacaoGrafico();
     mostrarToast('Etapa excluída.', 'sucesso');
@@ -670,7 +686,11 @@
     const proc = getProcessoAtual();
     if (!proc) return;
     proc.etapas = [];
-    await salvar();
+    const salvo = await salvar();
+    if (!salvo) {
+      await restaurarDoServidor();
+      return;
+    }
     renderizarTabela();
     agendarAtualizacaoGrafico();
     limparFormEtapa();
@@ -946,7 +966,11 @@
           estado.processoAtualId = processoUnico.id;
         }
         estado.versao = obj.versao != null ? obj.versao : VERSAO_SCHEMA;
-        await salvar();
+        const salvo = await salvar();
+        if (!salvo) {
+          await restaurarDoServidor();
+          return;
+        }
         renderizarListaProcessos();
         sincronizarUI();
         limparFormEtapa();
@@ -981,8 +1005,14 @@
 
   async function selectProcesso(id) {
     if (!estado.processos.some(p => p.id === id)) return;
+    const idAnterior = estado.processoAtualId;
     estado.processoAtualId = id;
-    await salvar();
+    const salvo = await salvar();
+    if (!salvo) {
+      estado.processoAtualId = idAnterior;
+      await restaurarDoServidor();
+      return;
+    }
     renderizarListaProcessos();
     sincronizarUI();
   }
@@ -1002,15 +1032,15 @@
     const novo = criarProcesso({ nome: nomeFinal, dataGoLive: '', etapas: [] });
     estado.processos.push(novo);
     estado.processoAtualId = novo.id;
-    const ok = await salvar();
+    const salvo = await salvar();
+    if (!salvo) {
+      await restaurarDoServidor();
+      return;
+    }
     renderizarListaProcessos();
     sincronizarUI();
     ref.nomeProcesso.focus();
-    if (ok) {
-      mostrarToast('Novo processo criado.', 'sucesso');
-    } else {
-      mostrarToast('Processo criado, mas nao foi possivel salvar no armazenamento remoto.', 'erro');
-    }
+    mostrarToast('Novo processo criado.', 'sucesso');
   });
 
   ref.btnExcluirProcesso.addEventListener('click', async () => {
@@ -1021,9 +1051,17 @@
       return;
     }
     if (!confirm('Excluir o processo "' + proc.nome + '" e todas as suas etapas?')) return;
+    const processosAnteriores = [...estado.processos];
+    const idAnterior = estado.processoAtualId;
     estado.processos = estado.processos.filter(p => p.id !== proc.id);
     estado.processoAtualId = estado.processos[0].id;
-    await salvar();
+    const salvo = await salvar();
+    if (!salvo) {
+      estado.processos = processosAnteriores;
+      estado.processoAtualId = idAnterior;
+      await restaurarDoServidor();
+      return;
+    }
     renderizarListaProcessos();
     sincronizarUI();
     limparFormEtapa();
