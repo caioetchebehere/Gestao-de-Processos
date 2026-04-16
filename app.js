@@ -186,11 +186,21 @@
         body: JSON.stringify(payload)
       });
       if (!resp.ok) {
-        throw new Error('Falha ao salvar');
+        let detalhe = '';
+        try {
+          const err = await resp.json();
+          if (err && typeof err === 'object') {
+            detalhe = (err.error || err.detalhe || err.hint || '').toString();
+          }
+        } catch (_) {
+          // ignore
+        }
+        throw new Error(detalhe || ('Falha ao salvar (HTTP ' + resp.status + ')'));
       }
       return true;
     } catch (e) {
-      mostrarToast('Erro ao salvar no Vercel Blob.', 'erro');
+      const msg = e && e.message ? e.message : '';
+      mostrarToast(msg ? ('Erro ao salvar: ' + msg) : 'Erro ao salvar no Vercel Blob.', 'erro');
       return false;
     }
   }
@@ -992,11 +1002,15 @@
     const novo = criarProcesso({ nome: nomeFinal, dataGoLive: '', etapas: [] });
     estado.processos.push(novo);
     estado.processoAtualId = novo.id;
-    await salvar();
+    const ok = await salvar();
     renderizarListaProcessos();
     sincronizarUI();
     ref.nomeProcesso.focus();
-    mostrarToast('Novo processo criado.', 'sucesso');
+    if (ok) {
+      mostrarToast('Novo processo criado.', 'sucesso');
+    } else {
+      mostrarToast('Processo criado, mas nao foi possivel salvar no armazenamento remoto.', 'erro');
+    }
   });
 
   ref.btnExcluirProcesso.addEventListener('click', async () => {

@@ -8,6 +8,14 @@ function enviarJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function getTokenInfo() {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token || typeof token !== 'string' || token.trim() === '') {
+    return { ok: false };
+  }
+  return { ok: true };
+}
+
 async function lerBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string' && req.body.trim() !== '') return JSON.parse(req.body);
@@ -30,6 +38,12 @@ async function lerBody(req) {
 
 module.exports = async (req, res) => {
   if (req.method === 'GET') {
+    if (!getTokenInfo().ok) {
+      return enviarJson(res, 500, {
+        error: 'BLOB_READ_WRITE_TOKEN nao configurado.',
+        hint: 'Defina a variavel de ambiente BLOB_READ_WRITE_TOKEN (Vercel Project Settings > Environment Variables) ou no .env ao usar `vercel dev`.'
+      });
+    }
     try {
       const blobInfo = await head(BLOB_PATH);
       const resp = await fetch(blobInfo.url, { cache: 'no-store' });
@@ -47,6 +61,12 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === 'POST') {
+    if (!getTokenInfo().ok) {
+      return enviarJson(res, 500, {
+        error: 'BLOB_READ_WRITE_TOKEN nao configurado.',
+        hint: 'Defina a variavel de ambiente BLOB_READ_WRITE_TOKEN (Vercel Project Settings > Environment Variables) ou no .env ao usar `vercel dev`.'
+      });
+    }
     try {
       const body = await lerBody(req);
       if (!body || typeof body !== 'object') {
