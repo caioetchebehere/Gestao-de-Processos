@@ -9,26 +9,28 @@ Aplicacao web estatica para cadastro e acompanhamento de processos e etapas, com
 - Status por etapa.
 - Grafico de evolucao do processo.
 - Exportacao e importacao de dados em JSON.
-- Persistencia local no navegador (`localStorage`).
+- Persistencia remota no Vercel Blob.
 
 ## Estrutura do projeto
 
 - `index.html`: estrutura da interface.
 - `styles.css`: estilos da aplicacao.
 - `app.js`: logica da aplicacao.
+- `api/storage.js`: API para leitura/escrita no Vercel Blob.
 - `vercel.json`: configuracao de deploy na Vercel.
+- `package.json`: dependencias para funcoes serverless.
 
 ## Como executar localmente
 
-Como o projeto e estatico, basta abrir o `index.html` no navegador.
+Como agora existe API para persistencia no Vercel Blob, rode com ambiente Node/Vercel.
 
-Opcionalmente, voce pode rodar um servidor local simples:
+Se tiver Vercel CLI instalado:
 
 ```bash
-python -m http.server 8000
+vercel dev
 ```
 
-Depois acesse: `http://localhost:8000`
+Depois acesse: `http://localhost:3000`
 
 ## Deploy na Vercel
 
@@ -41,6 +43,12 @@ Depois acesse: `http://localhost:8000`
    - Output Directory: vazio
 5. Clique em **Deploy**.
 
+### Variaveis de ambiente (obrigatorio)
+
+No projeto da Vercel, configure:
+
+- `BLOB_READ_WRITE_TOKEN`: token da sua store Vercel Blob com permissao de leitura/escrita.
+
 O arquivo `vercel.json` ja esta configurado para:
 
 - URLs limpas (`cleanUrls`).
@@ -49,5 +57,5 @@ O arquivo `vercel.json` ja esta configurado para:
 
 ## Observacoes
 
-- Os dados ficam salvos no navegador do usuario (`localStorage`).
-- Limpar dados do navegador pode remover os processos salvos localmente.
+- Os dados ficam salvos no arquivo `gestao-processos/dados.json` dentro do Vercel Blob.
+- Para desenvolvimento local sem Vercel CLI/API, a gravacao remota nao vai funcionar.

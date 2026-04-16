@@ -5,7 +5,7 @@
     Chart.register(window.chartjsPluginAnnotation);
   }
 
-  const CHAVE_STORAGE = 'gerenciamento-processos';
+  const STORAGE_API_URL = '/api/storage';
   const VERSAO_SCHEMA = 2;
   const DEBOUNCE_GRAFICO_MS = 300;
 
@@ -157,28 +157,39 @@
     return hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
   }
 
-  function salvar() {
+  function montarPayloadEstado() {
+    return {
+      processos: estado.processos.map(pr => ({
+        id: pr.id,
+        nome: pr.nome,
+        dataGoLive: pr.dataGoLive || '',
+        etapas: (Array.isArray(pr.etapas) ? pr.etapas : []).map(e => ({
+          id: e.id,
+          nome: e.nome,
+          dataInicio: getDataInicio(e),
+          dataFim: getDataFim(e),
+          area: e.area,
+          status: STATUS_ETAPA.includes(e.status) ? e.status : STATUS_ETAPA_PADRAO
+        }))
+      })),
+      processoAtualId: estado.processoAtualId,
+      versao: estado.versao
+    };
+  }
+
+  async function salvar() {
     try {
-      const payload = {
-        processos: estado.processos.map(pr => ({
-          id: pr.id,
-          nome: pr.nome,
-          dataGoLive: pr.dataGoLive || '',
-          etapas: (Array.isArray(pr.etapas) ? pr.etapas : []).map(e => ({
-            id: e.id,
-            nome: e.nome,
-            dataInicio: getDataInicio(e),
-            dataFim: getDataFim(e),
-            area: e.area,
-            status: STATUS_ETAPA.includes(e.status) ? e.status : STATUS_ETAPA_PADRAO
-          }))
-        })),
-        processoAtualId: estado.processoAtualId,
-        versao: estado.versao
-      };
-      localStorage.setItem(CHAVE_STORAGE, JSON.stringify(payload));
+      const payload = montarPayloadEstado();
+      const resp = await fetch(STORAGE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        throw new Error('Falha ao salvar');
+      }
     } catch (e) {
-      mostrarToast('Erro ao salvar no navegador.', 'erro');
+      mostrarToast('Erro ao salvar no Vercel Blob.', 'erro');
     }
   }
 
@@ -223,22 +234,25 @@
     }
   }
 
-  function carregar() {
+  async function carregar() {
     try {
-      const raw = localStorage.getItem(CHAVE_STORAGE);
-      if (!raw) {
+      const resp = await fetch(STORAGE_API_URL, { cache: 'no-store' });
+      if (resp.status === 404) {
         const primeiro = criarProcesso({
           nome: DADOS_EXEMPLO.processo.nome,
           dataGoLive: DADOS_EXEMPLO.processo.dataGoLive || '',
           etapas: DADOS_EXEMPLO.etapas
         });
         estado = { processos: [primeiro], processoAtualId: primeiro.id, versao: VERSAO_SCHEMA };
-        salvar();
+        await salvar();
         return;
       }
-      const data = JSON.parse(raw);
+      if (!resp.ok) {
+        throw new Error('Falha ao carregar');
+      }
+      const data = await resp.json();
       if (!data || typeof data !== 'object') {
-        usarDadosExemplo();
+        await usarDadosExemplo();
         return;
       }
       const ver = data.versao == null ? 1 : data.versao;
@@ -261,18 +275,18 @@
         estado = { processos: [processoUnico], processoAtualId: processoUnico.id, versao: VERSAO_SCHEMA };
       }
     } catch (e) {
-      usarDadosExemplo();
+      await usarDadosExemplo();
     }
   }
 
-  function usarDadosExemplo() {
+  async function usarDadosExemplo() {
     const primeiro = criarProcesso({
       nome: DADOS_EXEMPLO.processo.nome,
       dataGoLive: DADOS_EXEMPLO.processo.dataGoLive || '',
       etapas: DADOS_EXEMPLO.etapas
     });
     estado = { processos: [primeiro], processoAtualId: primeiro.id, versao: VERSAO_SCHEMA };
-    salvar();
+    await salvar();
   }
 
   function validarSchemaImportacao(obj) {
@@ -418,14 +432,14 @@
   ref.nomeProcesso.addEventListener('blur', validarNomeProcesso);
 
   // --- Form processo ---
-  ref.formProcesso.addEventListener('submit', (e) => {
+  ref.formProcesso.addEventListener('submit', async (e) => {
     e.preventDefault();
     const proc = getProcessoAtual();
     if (!proc) return;
     if (!validarNomeProcesso()) return;
     proc.nome = ref.nomeProcesso.value.trim();
     proc.dataGoLive = (ref.dataGoLive.value || '').trim();
-    salvar();
+    await salvar();
     renderizarListaProcessos();
     mostrarToast('Dados do processo salvos.', 'sucesso');
   });
@@ -522,7 +536,7 @@
   }
 
   // --- Adicionar etapa ---
-  ref.formEtapa.addEventListener('submit', (e) => {
+  ref.formEtapa.addEventListener('submit', async (e) => {
     e.preventDefault();
     e.stopPropagation();
     const proc = getProcessoAtual();
@@ -553,7 +567,7 @@
       proc.etapas = [...etapas, novaEtapa];
       mostrarToast('Etapa adicionada.', 'sucesso');
     }
-    salvar();
+    await salvar();
     limparFormEtapa();
     ref.btnAdicionarEtapa.textContent = 'Adicionar etapa';
     renderizarTabela();
@@ -640,11 +654,11 @@
   });
 
   // --- Limpar tudo ---
-  ref.btnLimparTudo.addEventListener('click', () => {
+  ref.btnLimparTudo.addEventListener('click', async () => {
     const proc = getProcessoAtual();
     if (!proc) return;
     proc.etapas = [];
-    salvar();
+    await salvar();
     renderizarTabela();
     agendarAtualizacaoGrafico();
     limparFormEtapa();
@@ -894,7 +908,7 @@
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const obj = JSON.parse(reader.result);
         if (!validarSchemaImportacao(obj)) {
@@ -920,7 +934,7 @@
           estado.processoAtualId = processoUnico.id;
         }
         estado.versao = obj.versao != null ? obj.versao : VERSAO_SCHEMA;
-        salvar();
+        await salvar();
         renderizarListaProcessos();
         sincronizarUI();
         limparFormEtapa();
@@ -953,15 +967,15 @@
     });
   }
 
-  function selectProcesso(id) {
+  async function selectProcesso(id) {
     if (!estado.processos.some(p => p.id === id)) return;
     estado.processoAtualId = id;
-    salvar();
+    await salvar();
     renderizarListaProcessos();
     sincronizarUI();
   }
 
-  ref.btnNovoProcesso.addEventListener('click', () => {
+  ref.btnNovoProcesso.addEventListener('click', async () => {
     const nomeInformado = prompt('Informe o nome do novo processo:');
     if (nomeInformado == null) return;
     const nomeFinal = nomeInformado.trim();
@@ -976,14 +990,14 @@
     const novo = criarProcesso({ nome: nomeFinal, dataGoLive: '', etapas: [] });
     estado.processos.push(novo);
     estado.processoAtualId = novo.id;
-    salvar();
+    await salvar();
     renderizarListaProcessos();
     sincronizarUI();
     ref.nomeProcesso.focus();
     mostrarToast('Novo processo criado.', 'sucesso');
   });
 
-  ref.btnExcluirProcesso.addEventListener('click', () => {
+  ref.btnExcluirProcesso.addEventListener('click', async () => {
     const proc = getProcessoAtual();
     if (!proc) return;
     if (estado.processos.length <= 1) {
@@ -993,7 +1007,7 @@
     if (!confirm('Excluir o processo "' + proc.nome + '" e todas as suas etapas?')) return;
     estado.processos = estado.processos.filter(p => p.id !== proc.id);
     estado.processoAtualId = estado.processos[0].id;
-    salvar();
+    await salvar();
     renderizarListaProcessos();
     sincronizarUI();
     limparFormEtapa();
@@ -1018,10 +1032,14 @@
   }
 
   // --- Inicialização ---
-  carregar();
-  removerProcessosPadraoNovo();
-  renderizarListaProcessos();
-  sincronizarUI();
-  atualizarVisibilidadeOutro();
-  atualizarBotaoToggleEtapas();
+  async function inicializar() {
+    await carregar();
+    await removerProcessosPadraoNovo();
+    renderizarListaProcessos();
+    sincronizarUI();
+    atualizarVisibilidadeOutro();
+    atualizarBotaoToggleEtapas();
+  }
+
+  inicializar();
 })();
