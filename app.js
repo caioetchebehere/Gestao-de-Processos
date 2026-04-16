@@ -188,8 +188,10 @@
       if (!resp.ok) {
         throw new Error('Falha ao salvar');
       }
+      return true;
     } catch (e) {
       mostrarToast('Erro ao salvar no Vercel Blob.', 'erro');
+      return false;
     }
   }
 
@@ -213,7 +215,7 @@
     return { id: gerarId(), nome, dataGoLive, etapas };
   }
 
-  function removerProcessosPadraoNovo() {
+  async function removerProcessosPadraoNovo() {
     const antes = estado.processos.length;
     estado.processos = estado.processos.filter(pr => {
       return (pr.nome || '').trim() !== 'Novo processo';
@@ -222,7 +224,7 @@
       const processoFallback = criarProcesso({ nome: 'Processo principal', dataGoLive: '', etapas: [] });
       estado.processos = [processoFallback];
       estado.processoAtualId = processoFallback.id;
-      salvar();
+      await salvar();
       return;
     }
     if (estado.processos.length === 0) return;
@@ -230,7 +232,7 @@
       estado.processoAtualId = estado.processos[0].id;
     }
     if (estado.processos.length !== antes) {
-      salvar();
+      await salvar();
     }
   }
 
@@ -631,11 +633,11 @@
     ref.nomeEtapa.focus();
   }
 
-  function excluirEtapa(id) {
+  async function excluirEtapa(id) {
     const proc = getProcessoAtual();
     if (!proc) return;
     proc.etapas = proc.etapas.filter(e => e.id !== id);
-    salvar();
+    await salvar();
     renderizarTabela();
     agendarAtualizacaoGrafico();
     mostrarToast('Etapa excluída.', 'sucesso');

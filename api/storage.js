@@ -8,6 +8,26 @@ function enviarJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+async function lerBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string' && req.body.trim() !== '') return JSON.parse(req.body);
+  return await new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      if (!data) return resolve({});
+      try {
+        resolve(JSON.parse(data));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 module.exports = async (req, res) => {
   if (req.method === 'GET') {
     try {
@@ -28,7 +48,7 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const body = await lerBody(req);
       if (!body || typeof body !== 'object') {
         return enviarJson(res, 400, { error: 'Payload invalido.' });
       }
@@ -39,7 +59,7 @@ module.exports = async (req, res) => {
       });
       return enviarJson(res, 200, { ok: true });
     } catch (error) {
-      return enviarJson(res, 500, { error: 'Erro ao gravar dados no Vercel Blob.' });
+      return enviarJson(res, 500, { error: 'Erro ao gravar dados no Vercel Blob.', detalhe: error && error.message ? error.message : 'desconhecido' });
     }
   }
 

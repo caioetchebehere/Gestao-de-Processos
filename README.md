@@ -1,4 +1,4 @@
-# Gerenciamento de Processos
+# Gestão de Processos
 
 Aplicacao web estatica para cadastro e acompanhamento de processos e etapas, com visualizacao em tabela e grafico.
 
