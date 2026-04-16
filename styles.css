@@ -94,6 +94,63 @@ body {
   color: var(--cinza-800);
 }
 
+.card-painel {
+  padding: 1rem 1.5rem;
+}
+
+.painel-metricas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.metrica {
+  min-width: 240px;
+  border: 1px solid var(--cinza-200);
+  border-radius: var(--raio);
+  padding: 0.75rem 1rem;
+  background: var(--cinza-100);
+}
+
+.metrica-status {
+  min-width: 360px;
+}
+
+.metrica-rotulo {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--cinza-700);
+}
+
+.metrica-valor {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.75rem;
+  color: var(--cor-primaria);
+  line-height: 1.1;
+}
+
+.lista-status {
+  list-style: none;
+  margin: 0.5rem 0 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 0.25rem 0.75rem;
+}
+
+.item-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: var(--cinza-800);
+}
+
+.item-status strong {
+  color: var(--cor-primaria);
+}
+
 /* --- Formulários --- */
 .form-processo,
 .form-etapa {

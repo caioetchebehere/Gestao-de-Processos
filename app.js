@@ -205,10 +205,15 @@
   function removerProcessosPadraoNovo() {
     const antes = estado.processos.length;
     estado.processos = estado.processos.filter(pr => {
-      const nomePadrao = (pr.nome || '').trim() === 'Novo processo';
-      const semConteudo = (!pr.dataGoLive || pr.dataGoLive.trim() === '') && (!Array.isArray(pr.etapas) || pr.etapas.length === 0);
-      return !(nomePadrao && semConteudo);
+      return (pr.nome || '').trim() !== 'Novo processo';
     });
+    if (estado.processos.length === 0 && antes > 0) {
+      const processoFallback = criarProcesso({ nome: 'Processo principal', dataGoLive: '', etapas: [] });
+      estado.processos = [processoFallback];
+      estado.processoAtualId = processoFallback.id;
+      salvar();
+      return;
+    }
     if (estado.processos.length === 0) return;
     if (!estado.processos.some(p => p.id === estado.processoAtualId)) {
       estado.processoAtualId = estado.processos[0].id;
@@ -307,6 +312,8 @@
 
   // --- DOM e referências ---
   const ref = {
+    qtdProcessosTotal: document.getElementById('qtd-processos-total'),
+    listaStatusProcessos: document.getElementById('lista-status-processos'),
     listaProcessos: document.getElementById('lista-processos'),
     btnNovoProcesso: document.getElementById('btn-novo-processo'),
     mensagemNenhumProcesso: document.getElementById('mensagem-nenhum-processo'),
@@ -358,6 +365,39 @@
     setTimeout(() => {
       if (div.parentNode) div.parentNode.removeChild(div);
     }, 3500);
+  }
+
+  function obterStatusProcesso(processo) {
+    const etapas = processo && Array.isArray(processo.etapas) ? processo.etapas : [];
+    if (etapas.length === 0) return 'Não iniciado';
+
+    const statusEtapas = etapas.map(e => STATUS_ETAPA.includes(e.status) ? e.status : STATUS_ETAPA_PADRAO);
+    if (statusEtapas.includes('Em andamento')) return 'Em andamento';
+    if (statusEtapas.includes('Pausado')) return 'Pausado';
+    if (statusEtapas.every(s => s === 'Concluído')) return 'Concluído';
+    if (statusEtapas.every(s => s === 'Cancelado')) return 'Cancelado';
+    return 'Não iniciado';
+  }
+
+  function atualizarPainelStatusProcessos() {
+    if (ref.qtdProcessosTotal) {
+      ref.qtdProcessosTotal.textContent = String(estado.processos.length);
+    }
+    if (!ref.listaStatusProcessos) return;
+
+    const contagem = {};
+    STATUS_ETAPA.forEach(status => {
+      contagem[status] = 0;
+    });
+
+    estado.processos.forEach(processo => {
+      const statusProcesso = obterStatusProcesso(processo);
+      contagem[statusProcesso] += 1;
+    });
+
+    ref.listaStatusProcessos.innerHTML = STATUS_ETAPA.map(status =>
+      '<li class="item-status"><span>' + escapeHtml(status) + '</span><strong>' + contagem[status] + '</strong></li>'
+    ).join('');
   }
 
   // --- Validação formulário processo ---
@@ -897,6 +937,7 @@
 
   // --- Lista de processos: renderizar e seleção ---
   function renderizarListaProcessos() {
+    atualizarPainelStatusProcessos();
     ref.listaProcessos.innerHTML = '';
     ref.mensagemNenhumProcesso.hidden = estado.processos.length > 0;
     estado.processos.forEach(pr => {
@@ -926,6 +967,10 @@
     const nomeFinal = nomeInformado.trim();
     if (!nomeFinal) {
       mostrarToast('Informe um nome para criar o processo.', 'erro');
+      return;
+    }
+    if (nomeFinal.toLocaleLowerCase('pt-BR') === 'novo processo') {
+      mostrarToast('Use um nome diferente de "Novo processo".', 'erro');
       return;
     }
     const novo = criarProcesso({ nome: nomeFinal, dataGoLive: '', etapas: [] });

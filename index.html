@@ -13,6 +13,21 @@
     </header>
 
     <main class="main" role="main">
+      <!-- Painel de status dos processos -->
+      <section class="card card-painel" aria-labelledby="titulo-painel-processos">
+        <h2 id="titulo-painel-processos">Painel de Status dos Processos</h2>
+        <div class="painel-metricas">
+          <div class="metrica">
+            <span class="metrica-rotulo">Quantidade total de processos</span>
+            <strong class="metrica-valor" id="qtd-processos-total">0</strong>
+          </div>
+          <div class="metrica metrica-status">
+            <span class="metrica-rotulo">Quantidade por status do processo</span>
+            <ul class="lista-status" id="lista-status-processos"></ul>
+          </div>
+        </div>
+      </section>
+
       <!-- Lista de processos -->
       <section class="card card-processos" aria-labelledby="titulo-meus-processos">
         <div class="cabecalho-lista">
@@ -56,7 +71,17 @@
           <div class="grid-form">
             <div class="campo">
               <label for="nome-etapa">Nome da etapa <span class="obrigatorio">*</span></label>
-              <input type="text" id="nome-etapa" name="nome-etapa" required minlength="3" maxlength="200" placeholder="Ex.: Levantamento de requisitos" autocomplete="off">
+              <select id="nome-etapa" name="nome-etapa" required aria-describedby="desc-nome-etapa">
+                <option value="">Selecione...</option>
+                <option value="Testes integrados">Testes integrados</option>
+                <option value="Piloto">Piloto</option>
+                <option value="Rollout">Rollout</option>
+                <option value="Definição de processo">Definição de processo</option>
+                <option value="Criação de material">Criação de material</option>
+                <option value="Treinamento para Suporte">Treinamento para Suporte</option>
+                <option value="Treinamento para loja">Treinamento para loja</option>
+              </select>
+              <span id="desc-nome-etapa" class="visually-hidden">Selecione o nome da etapa na lista</span>
               <span class="erro-campo" id="erro-nome-etapa" role="alert" aria-live="polite"></span>
             </div>
             <div class="campo">
