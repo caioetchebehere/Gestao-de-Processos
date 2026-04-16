@@ -1,5 +1,9 @@
 import { list, put } from '@vercel/blob';
 
+/** Prefixo customizado na Vercel: GESTAO_BLOB → GESTAO_BLOB_READ_WRITE_TOKEN */
+const BLOB_TOKEN =
+  process.env.GESTAO_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+
 const PATHNAME = 'gestao-novos-processos/estado-app.json';
 
 function readJsonBody(req) {
@@ -19,12 +23,13 @@ function readJsonBody(req) {
 }
 
 export default async function handler(req, res) {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const token = BLOB_TOKEN;
   if (!token) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(503).json({
       error: 'missing_blob_token',
-      message: 'Defina o store Blob no projeto (Vercel: Storage > Blob > conectar) para gerar BLOB_READ_WRITE_TOKEN.'
+      message:
+        'Configure GESTAO_BLOB_READ_WRITE_TOKEN (prefixo GESTAO_BLOB ao ligar o Blob) ou BLOB_READ_WRITE_TOKEN.'
     });
   }
 

@@ -1092,7 +1092,7 @@
     atualizarGrafico();
   }
 
-  // --- Inicialização (Blob na Vercel quando BLOB_READ_WRITE_TOKEN existir) ---
+  // --- Inicialização (Blob na Vercel: GESTAO_BLOB_READ_WRITE_TOKEN ou BLOB_READ_WRITE_TOKEN) ---
   (async function iniciar() {
     try {
       await carregar();
