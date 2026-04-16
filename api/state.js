@@ -6,73 +6,75 @@ const BLOB_TOKEN =
 
 const PATHNAME = 'gestao-novos-processos/estado-app.json';
 
-function readJsonBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => {
-      try {
-        const raw = Buffer.concat(chunks).toString('utf8');
-        resolve(raw ? JSON.parse(raw) : null);
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
-  });
-}
+const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
-export default async function handler(req, res) {
-  const token = BLOB_TOKEN;
-  if (!token) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.status(503).json({
+function missingTokenResponse() {
+  return Response.json(
+    {
       error: 'missing_blob_token',
       message:
         'Configure GESTAO_BLOB_READ_WRITE_TOKEN (prefixo GESTAO_BLOB ao ligar o Blob) ou BLOB_READ_WRITE_TOKEN.'
+    },
+    { status: 503, headers: JSON_HEADERS }
+  );
+}
+
+/** Formato Web API (GET/PUT) exigido pela Vercel em projetos estáticos; o antigo (req, res) devolve NOT_FOUND. */
+export async function GET() {
+  const token = BLOB_TOKEN;
+  if (!token) return missingTokenResponse();
+
+  try {
+    const { blobs } = await list({ prefix: 'gestao-novos-processos/', token });
+    const blob = blobs.find((b) => b.pathname === PATHNAME);
+    if (!blob) {
+      return new Response(null, { status: 404 });
+    }
+    const r = await fetch(blob.url);
+    if (!r.ok) {
+      return Response.json(
+        { error: 'blob_fetch_failed', status: r.status },
+        { status: 502, headers: JSON_HEADERS }
+      );
+    }
+    const text = await r.text();
+    return new Response(text, { status: 200, headers: JSON_HEADERS });
+  } catch (e) {
+    console.error(e);
+    return Response.json(
+      { error: 'get_failed', message: e.message || String(e) },
+      { status: 500, headers: JSON_HEADERS }
+    );
+  }
+}
+
+export async function PUT(request) {
+  const token = BLOB_TOKEN;
+  if (!token) return missingTokenResponse();
+
+  try {
+    let data;
+    try {
+      data = await request.json();
+    } catch {
+      return Response.json({ error: 'invalid_json' }, { status: 400, headers: JSON_HEADERS });
+    }
+    if (data == null || typeof data !== 'object') {
+      return Response.json({ error: 'invalid_json' }, { status: 400, headers: JSON_HEADERS });
+    }
+    await put(PATHNAME, JSON.stringify(data), {
+      access: 'public',
+      token,
+      contentType: 'application/json; charset=utf-8',
+      addRandomSuffix: false,
+      allowOverwrite: true
     });
+    return new Response(null, { status: 204 });
+  } catch (e) {
+    console.error(e);
+    return Response.json(
+      { error: 'put_failed', message: e.message || String(e) },
+      { status: 500, headers: JSON_HEADERS }
+    );
   }
-
-  if (req.method === 'GET') {
-    try {
-      const { blobs } = await list({ prefix: 'gestao-novos-processos/', token });
-      const blob = blobs.find((b) => b.pathname === PATHNAME);
-      if (!blob) {
-        return res.status(404).end();
-      }
-      const r = await fetch(blob.url);
-      if (!r.ok) {
-        return res.status(502).json({ error: 'blob_fetch_failed', status: r.status });
-      }
-      const text = await r.text();
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      return res.status(200).send(text);
-    } catch (e) {
-      console.error(e);
-      return res.status(500).json({ error: 'get_failed', message: e.message || String(e) });
-    }
-  }
-
-  if (req.method === 'PUT') {
-    try {
-      const data = await readJsonBody(req);
-      if (data == null || typeof data !== 'object') {
-        return res.status(400).json({ error: 'invalid_json' });
-      }
-      await put(PATHNAME, JSON.stringify(data), {
-        access: 'public',
-        token,
-        contentType: 'application/json; charset=utf-8',
-        addRandomSuffix: false,
-        allowOverwrite: true
-      });
-      return res.status(204).end();
-    } catch (e) {
-      console.error(e);
-      return res.status(500).json({ error: 'put_failed', message: e.message || String(e) });
-    }
-  }
-
-  res.setHeader('Allow', 'GET, PUT');
-  return res.status(405).json({ error: 'method_not_allowed' });
 }
